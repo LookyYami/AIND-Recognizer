@@ -10,7 +10,7 @@ from asl_utils import combine_sequences
 
 class ModelSelector(object):
     '''
-    base class for model selection (strategy design pattern)
+    baseo class fr model selection (strategy design pattern)
     '''
 
     def __init__(self, all_word_sequences: dict, all_word_Xlengths: dict, this_word: str,
@@ -75,9 +75,23 @@ class SelectorBIC(ModelSelector):
         :return: GaussianHMM object
         """
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        best_score = float('-inf')
+        best_model = None
 
-        # TODO implement model selection based on BIC scores
-        raise NotImplementedError
+        for n_components in range(self.min_n_components, self.max_n_components):
+            try:
+                model = self.base_model(n_components)
+                logL = model.score(self.X, self.lengths)
+                logN = np.log(np.sum(self.lengths))
+                p = n_components * (n_components-1) + 2 * self.X.shape[1] * n_components
+                BIC_score = -2 * logL + p * logN
+                if BIC_score > best_score:
+                    best_score = BIC_score
+                    best_model = model
+            except:
+                pass
+
+        return best_model
 
 
 class SelectorDIC(ModelSelector):
@@ -91,9 +105,27 @@ class SelectorDIC(ModelSelector):
 
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
+        best_score = float('-inf')
+        best_model = None
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        for n_components in range(self.min_n_components, self. max_n_components):
+            model = self.base_model(n_components)
+            scores = []
+            try:
+                for word in self.words:
+                    if word != self.this_word:
+                        X, length = self.hwords[word]
+                        scores.append(model.score(X, length))
+
+                score = model.score(self.X, self.lengths)
+                DIC_Score = score - (1/ (len(self.words)-1)) * sum(scores)
+                if DIC_Score > best_score:
+                    best_score = DIC_Score
+                    best_model = model
+            except:
+                pass
+
+        return best_model
 
 
 class SelectorCV(ModelSelector):
@@ -104,5 +136,29 @@ class SelectorCV(ModelSelector):
     def select(self):
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-        # TODO implement model selection using CV
-        raise NotImplementedError
+        words = self.sequences
+        best_score = float('-inf')
+        best_model = None
+        try:
+            split_method = KFold(n_splits=min(3, len(words)))
+        except:
+            return None
+
+        for n_components in range(self.min_n_components, self.max_n_components):
+            model = self.base_model(n_components)
+            scores = []
+            try:
+                for cv_train_idx, cv_test_idx in split_method.split(words):
+                    cv_train_x, cv_train_length = combine_sequences(cv_train_idx, words)
+                    cv_test_x, cv_test_length = combine_sequences(cv_test_idx, words)
+                    model.fit(cv_train_x, cv_train_length)
+                    scores.append(model.score(cv_test_x, cv_test_length))
+
+                avg_score = sum(scores)/len(scores)
+                if avg_score > best_score:
+                    best_score = avg_score
+                    best_model = model
+            except:
+                pass
+
+        return best_model

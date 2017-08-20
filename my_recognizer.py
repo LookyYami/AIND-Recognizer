@@ -16,10 +16,48 @@ def recognize(models: dict, test_set: SinglesData):
             ]
        guesses is a list of the best guess words ordered by the test set word_id
            ['WORDGUESS0', 'WORDGUESS1', 'WORDGUESS2',...]
-   """
+    """
     warnings.filterwarnings("ignore", category=DeprecationWarning)
     probabilities = []
     guesses = []
-    # TODO implement the recognizer
-    # return probabilities, guesses
-    raise NotImplementedError
+
+    sequences = test_set.get_all_sequences()
+    XLenghts = test_set.get_all_Xlengths()
+
+    for s in sequences:
+        X, length = XLenghts[s]
+        p = {}
+        guess = ""
+        for word, model in models.items():
+            try:
+                p[word] = model.score(X, length)
+            except:
+                p[word] = float('-inf')
+        probabilities.append(p)
+        values = list(p.values())
+        keys = list(p.keys())
+        guesses.append(keys[values.index(max(values))])
+
+    return probabilities, guesses
+
+    """
+    valid_models = {word: model for word,model in models.items() if model is not None}
+    probabilities = [word_probabilities(valid_models, *test_set.get_item_Xlengths(i))
+                     for i,_ in enumerate(test_set.wordlist)]
+    guesses = [best_guess(word_probs) for word_probs in probabilities]
+    return probabilities, guesses
+
+def word_probabilities(models, X, lengths):
+    word_probs = {}
+
+    for word,model in models.items():
+        try:
+            word_probs[word] = model.score(X, lengths)
+        except ValueError:  # The hmmlearn library may not be able to train or score all models.
+            word_probs[word] = float('-inf')
+
+    return word_probs
+
+def best_guess(word_probs):
+    return max(word_probs.keys(), key=lambda word: word_probs[word])
+   """
